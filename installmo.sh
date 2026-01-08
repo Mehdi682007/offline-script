@@ -125,31 +125,82 @@ setup_docker(){
 # ---------------- Project add/remove ----------------
 add_project_menu(){
   header
+
   read -rp "Project name: " p
   read -rp "Version: " v
   read -rp "Direct URL: " u
 
+  # sanitize inputs
   p="$(sanitize "$p")"
   v="$(sanitize "$v")"
+  u="$(echo "$u" | tr -d ' \n\r\t')"
+
   is_url "$u" || { err "Bad URL"; pause; return; }
 
-  mkdir -p "$FILES_DIR/$p/$v"
-  cd "$FILES_DIR/$p/$v"
+  local fname
+  fname="$(basename "$u")"
 
-  curl -L --fail -o package "$(basename "$u")" "$u"
+  mkdir -p "$FILES_DIR/$p/$v"
+  cd "$FILES_DIR/$p/$v" || return 1
+
+  info "Downloading: $u"
+  if ! curl -L --fail -o "$fname" "$u"; then
+    err "Download failed"
+    pause
+    return
+  fi
+
+  # checksum
+  sha256sum "$fname" > SHA256SUMS.txt
 
   read -rp "Create auto-installer? [y/N]: " yn
   if [[ "$yn" =~ ^[Yy]$ ]]; then
     cat >"$FILES_DIR/$p/install-${p}-offline.sh" <<EOF
 #!/usr/bin/env bash
-set -e
-curl -fsSL http://YOUR_MOTHER_IP/files/$p/$v/$(basename "$u") | bash
+set -euo pipefail
+
+MOTHER_BASE="http://YOUR_MOTHER_IP"
+FILE="$fname"
+
+tmp=\$(mktemp -d)
+trap 'rm -rf "\$tmp"' EXIT
+cd "\$tmp"
+
+curl -fsSL "\$MOTHER_BASE/files/$p/$v/\$FILE" -o "\$FILE"
+curl -fsSL "\$MOTHER_BASE/files/$p/$v/SHA256SUMS.txt" -o SHA256SUMS.txt
+sha256sum -c SHA256SUMS.txt
+
+INSTALL_DIR="/opt/offline-projects/$p/$v"
+mkdir -p "\$INSTALL_DIR"
+
+case "\$FILE" in
+  *.sh)
+    chmod +x "\$FILE"
+    bash "\$FILE"
+    ;;
+  *.tar.gz|*.tgz)
+    tar -xzf "\$FILE" -C "\$INSTALL_DIR"
+    ;;
+  *.zip)
+    unzip -oq "\$FILE" -d "\$INSTALL_DIR"
+    ;;
+  *)
+    cp "\$FILE" "\$INSTALL_DIR/"
+    ;;
+esac
+
+echo "✅ $p installed."
 EOF
+
     chmod +x "$FILES_DIR/$p/install-${p}-offline.sh"
+    chown www-data:www-data "$FILES_DIR/$p/install-${p}-offline.sh"
+    ok "Auto-installer created"
+  else
+    info "Manual project (no installer)"
   fi
 
   update_index
-  ok "Project added."
+  ok "Project added: $p ($v)"
   pause
 }
 
