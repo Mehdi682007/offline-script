@@ -17,6 +17,7 @@
 
 نصب روی سرور مادر
 
+
 ```
 bash <(curl -Ls https://raw.githubusercontent.com/Mehdi682007/offline-script/main/installmo.sh)
 ```
