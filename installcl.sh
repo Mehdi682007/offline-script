@@ -51,8 +51,10 @@ install_docker(){
     echo "ℹ️  Docker already installed."
   fi
 
+  # Ensure config dir exists
   mkdir -p /etc/docker
 
+  # Force Docker to treat Mother registry as HTTP (insecure registry)
   cat >/etc/docker/daemon.json <<EOF
 {
   "insecure-registries": ["${MOTHER_IP}:5000"]
@@ -60,13 +62,20 @@ install_docker(){
 EOF
 
   systemctl daemon-reload
-  systemctl enable --now docker
+
+  # Make sure docker is enabled and running
+  systemctl enable --now docker >/dev/null 2>&1 || true
+
+  # IMPORTANT: restart so daemon.json takes effect immediately
+  systemctl restart docker >/dev/null 2>&1 || true
 
   echo
   echo "✅ Docker ready."
   echo "➡️ Registry: ${MOTHER_IP}:5000"
+  echo "🧪 Test: docker pull ${MOTHER_IP}:5000/nginx:alpine"
   pause
 }
+
 # ==========================================
 
 install_project(){
