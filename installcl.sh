@@ -11,7 +11,7 @@ fi
 
 MOTHER_IP="${1:-}"
 if [ -z "$MOTHER_IP" ]; then
-  read -rp "Enter Mother IP (e.g. 78.47.33.109): " MOTHER_IP
+  read -rp "Enter Mother IP (e.g. 88.127.22.33): " MOTHER_IP
 fi
 
 BASE="http://${MOTHER_IP}"
